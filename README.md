@@ -1,4 +1,3 @@
-```text
 # AgroQuiriquina — Sistema de Gestión Agrícola y Operación Offline
 
 Proyecto académico desarrollado para el diseño e implementación de una arquitectura cliente-servidor con soporte de operación desconectada (*Offline-First*) mediante Progressive Web App (PWA), control de acceso basado en roles (RBAC) y sincronización idempotente.
@@ -31,7 +30,6 @@ flowchart LR
     A -->|Reconexión / Ciclo 60s| C[Endpoints Bulk Sync]
     C -->|Validación UUID| B
     B -->|Delta de catálogo| A
-
 ```
 
 ### Estructura del Proyecto
@@ -47,7 +45,6 @@ apps/
 config/       Configuración modular de Django y enrutamiento principal
 docker/       Scripts de inicialización y despliegue en contenedores
 frontend/     Aplicación cliente React + TypeScript configurada como PWA
-
 ```
 
 ### Modelo Relacional Implementado
@@ -132,29 +129,25 @@ La autorización se aplica a nivel de endpoints en el backend independientemente
 ### Configuración del Backend
 
 1. Crear y activar el entorno virtual desde la raíz del repositorio:
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-
 ```
 
-
 2. Instalar dependencias, ejecutar migraciones y poblar la base de datos con el escenario de evaluación:
+
 ```powershell
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py seed_demo
-
 ```
-
 
 3. Levantar el servidor de desarrollo:
+
 ```powershell
 python manage.py runserver
-
 ```
-
-
 
 ### Configuración del Frontend
 
@@ -164,7 +157,6 @@ En una segunda terminal:
 cd frontend
 npm ci
 npm run dev
-
 ```
 
 *(Opcional)* **Despliegue mediante Docker Compose:**
@@ -173,7 +165,6 @@ npm run dev
 cp .env.docker.example .env
 docker compose up --build
 docker compose exec web python manage.py seed_demo
-
 ```
 
 ## 5. Escenario de Pruebas y Cuentas de Evaluación
@@ -199,7 +190,6 @@ python manage.py test
 cd frontend
 npm run type-check
 npm run build
-
 ```
 
 ## 7. Limitaciones Conocidas (Alcance del Prototipo)
@@ -207,7 +197,4 @@ npm run build
 * **Persistencia Local:** La cola offline utiliza `localStorage` sin cifrado en reposo en el navegador; en un entorno productivo se recomienda migrar a IndexedDB con cifrado a nivel de aplicación.
 * **Resolución de Conflictos:** La sincronización previene duplicados mediante UUID, pero no implementa resolución automática de conflictos (*CRDTs* o *Last-Write-Wins* granular) ante ediciones concurrentes sobre un mismo registro maestro.
 * **Certificados SSL:** La instalación completa como PWA en dispositivos móviles externos requiere servir la aplicación bajo HTTPS.
-
-```
-
-```
+````[cite: 2]

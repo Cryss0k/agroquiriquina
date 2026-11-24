@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { Token, User } from '../../types';
 import { api, configureApi, isNetworkError } from '../../services/api';
 import { remove } from '../../services/storage';
+import logo from '../../../static/icons/logo.png';
 
 export function Login({ onLogin }: { onLogin: (token: Token, user: User) => void }) {
   const [username, setUsername] = useState('');
@@ -24,7 +25,7 @@ export function Login({ onLogin }: { onLogin: (token: Token, user: User) => void
     } finally { setLoading(false); }
   };
   return <main className="lg"><form className="card" onSubmit={submit}>
-    <img className="login-logo" src="/static/icons/logo.png" alt="AgroQuiriquina" />
+    <img className="login-logo" src={logo} alt="AgroQuiriquina" />
     <h2 style={{ textAlign: 'center' }}>Ingresar a mi Cuenta</h2>
     <label htmlFor="username">Usuario</label><input id="username" value={username} onChange={e => setUsername(e.target.value)} autoCapitalize="none" autoComplete="username" required />
     <label htmlFor="password">Contraseña</label><input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" required />
