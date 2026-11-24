@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.core.validators import normalizar_rut
 
-from .models import Cliente, Persona, Proveedor, Trabajador, User
+from .models import Cliente, Distribuidor, Persona, Proveedor, Trabajador, User
 from .passwords import password_validation_error
 
 
@@ -45,6 +45,12 @@ class ProveedorSerializer(PersonaBaseSerializer):
         fields = PersonaBaseSerializer.Meta.fields + ["rubro", "condiciones_pago"]
 
 
+class DistribuidorSerializer(PersonaBaseSerializer):
+    class Meta(PersonaBaseSerializer.Meta):
+        model = Distribuidor
+        fields = PersonaBaseSerializer.Meta.fields + ["patente", "activo"]
+
+
 class TrabajadorSerializer(PersonaBaseSerializer):
     class Meta(PersonaBaseSerializer.Meta):
         model = Trabajador
@@ -67,6 +73,13 @@ class UserSerializer(serializers.ModelSerializer):
         if error:
             raise serializers.ValidationError(error)
         return value
+
+    def validate(self, attrs):
+        if self.instance is None and not attrs.get("password"):
+            raise serializers.ValidationError({
+                "password": "Este campo es obligatorio al crear un usuario.",
+            })
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

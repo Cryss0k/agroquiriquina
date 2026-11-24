@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation
 
+from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -9,8 +10,9 @@ from rest_framework.response import Response
 from apps.core.permissions import HasRole, SUPERVISOR, VENDEDOR
 from apps.core.viewsets import SyncModelViewSet
 
-from .models import InsumoAgricola, MovimientoStock, ProductoVenta
-from .serializers import (InsumoAgricolaSerializer, MovimientoInputSerializer,
+
+from .models import Compra, InsumoAgricola, MovimientoStock, ProductoVenta
+from .serializers import (CompraSerializer, InsumoAgricolaSerializer, MovimientoInputSerializer,
                           MovimientoStockSerializer, ProductoVentaSerializer)
 from .services import StockInsuficiente, aplicar_movimiento
 
@@ -78,3 +80,34 @@ class MovimientoStockViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, HasRole]
     read_roles = [SUPERVISOR]
     filterset_fields = {"item": ["exact"], "tipo": ["exact"], "created_at": ["gte", "lte"]}
+
+
+class CompraViewSet(SyncModelViewSet):
+    queryset = Compra.objects.select_related("proveedor", "usuario").prefetch_related("detalles")
+    serializer_class = CompraSerializer
+    read_roles = [SUPERVISOR]
+    write_roles = []
+
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+
+    @transaction.atomic
+    @action(detail=True, methods=["post"])
+    def recepcion(self, request, pk=None):
+        compra = self.get_object()
+        if compra.estado != Compra.Estado.REGISTRADA:
+            raise ValidationError({"estado": "La compra no puede ser recepcionada."})
+
+        for detalle in compra.detalles.select_related("insumo"):
+            aplicar_movimiento(
+                detalle.insumo.pk,
+                tipo=MovimientoStock.Tipo.ENTRADA,
+                cantidad=detalle.cantidad,
+                usuario=request.user,
+                motivo=f"Recepción compra {compra.pk}",
+                referencia=compra.pk,
+            )
+
+        compra.estado = Compra.Estado.RECEPCIONADA
+        compra.save(update_fields=["estado", "updated_at"])
+        return Response(CompraSerializer(compra).data)

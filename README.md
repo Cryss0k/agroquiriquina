@@ -50,6 +50,58 @@ frontend/     Aplicación cliente React + TypeScript configurada como PWA
 
 ```
 
+### Modelo Relacional Implementado
+
+El esquema de Django implementa las entidades y relaciones del modelo relacional adjunto:
+
+| Entidad | Tabla funcional | Relaciones principales |
+|---|---|---|
+| Usuario | `User` | Vinculado opcionalmente con `Trabajador` mediante `persona`; registra ventas, movimientos y desempeños |
+| Persona | `Persona` | Superclase de `Cliente`, `Proveedor` y `Trabajador` |
+| Cliente | `Cliente` | Uno a muchos con `Venta` |
+| Proveedor | `Proveedor` | Datos comerciales de proveedores del sistema |
+| Trabajador | `Trabajador` | Uno a muchos con `Desempeno` y `Remuneracion` |
+| Ítem de bodega | `ItemBodega` | Superclase de `ProductoVenta` e `InsumoAgricola` |
+| Producto de venta | `ProductoVenta` | Uno a muchos con `DetalleVenta` |
+| Insumo agrícola | `InsumoAgricola` | Herencia de `ItemBodega` con dosis por hectárea |
+| Movimiento de stock | `MovimientoStock` | Muchos a uno con `ItemBodega` y el usuario que lo registra |
+| Venta | `Venta` | Muchos a uno con `Cliente` y `User`; uno a muchos con `DetalleVenta` y `Pago` |
+| Detalle de venta | `DetalleVenta` | Muchos a uno con `Venta` y `ProductoVenta` |
+| Pago | `Pago` | Muchos a uno con `Venta` |
+| Despacho | `Despacho` | Uno a uno con `Venta` |
+| Remuneración | `Remuneracion` | Muchos a uno con `Trabajador` |
+| Desempeño | `Desempeno` | Muchos a uno con `Trabajador`, `User` y opcionalmente `Remuneracion` |
+
+Las entidades operativas y sincronizables usan identificadores UUID. Los registros de contacto emplean herencia multi-tabla y el sistema conserva borrados lógicos mediante `is_deleted`.
+
+### Diagrama de Clases del Dominio
+
+```mermaid
+classDiagram
+  Persona <|-- Cliente
+  Persona <|-- Trabajador
+  Persona <|-- Proveedor
+  Persona <|-- Distribuidor
+  ItemBodega <|-- ProductoVenta
+  ItemBodega <|-- InsumoAgricola
+  Usuario "1" --> "0..*" Venta : registra
+  Cliente "1" --> "0..*" Venta : realiza
+  Venta "1" *-- "1..*" DetalleVenta
+  ProductoVenta "1" <-- "0..*" DetalleVenta
+  Venta "1" *-- "0..*" Pago
+  Venta "1" -- "0..1" Despacho
+  Distribuidor "1" --> "0..*" Despacho : distribuye
+  Proveedor "1" --> "0..*" Compra : suministra
+  Usuario "1" --> "0..*" Compra : registra
+  Compra "1" *-- "1..*" DetalleCompra
+  InsumoAgricola "1" <-- "0..*" DetalleCompra
+  ItemBodega "1" --> "0..*" MovimientoStock
+  Usuario "1" --> "0..*" MovimientoStock : registra
+  Trabajador "1" --> "0..*" Desempeno
+  Trabajador "1" --> "0..*" Remuneracion
+  Remuneracion "1" --> "0..*" Desempeno
+```
+
 ## 3. Modelo de Seguridad y Control de Acceso (RBAC)
 
 La autorización se aplica a nivel de endpoints en el backend independientemente de las restricciones visuales del frontend:

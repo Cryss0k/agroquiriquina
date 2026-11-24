@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import InsumoAgricola, MovimientoStock, ProductoVenta
+from .models import Compra, DetalleCompra, InsumoAgricola, MovimientoStock, ProductoVenta
 
 
 class ProductoVentaSerializer(serializers.ModelSerializer):
@@ -37,3 +37,35 @@ class MovimientoStockSerializer(serializers.ModelSerializer):
         model = MovimientoStock
         fields = ["id", "item", "tipo", "cantidad", "motivo", "referencia", "usuario", "created_at"]
         read_only_fields = fields
+
+
+class DetalleCompraSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DetalleCompra
+        fields = ["id", "insumo", "cantidad", "costo_unitario", "subtotal"]
+        read_only_fields = ["subtotal"]
+        extra_kwargs = {"id": {"read_only": False, "required": False}}
+
+    def validate_cantidad(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("La cantidad debe ser mayor que 0.")
+        return value
+
+
+class CompraSerializer(serializers.ModelSerializer):
+    detalles = DetalleCompraSerializer(many=True, allow_empty=False)
+
+    class Meta:
+        model = Compra
+        fields = ["id", "proveedor", "usuario", "fecha", "estado", "total",
+                  "observaciones", "detalles", "updated_at", "is_deleted"]
+        read_only_fields = ["usuario", "estado", "total", "updated_at"]
+        extra_kwargs = {"id": {"read_only": False, "required": False}}
+
+    def create(self, validated_data):
+        detalles = validated_data.pop("detalles")
+        compra = Compra.objects.create(**validated_data)
+        for detalle in detalles:
+            DetalleCompra.objects.create(compra=compra, **detalle)
+        compra.recalcular_total()
+        return compra

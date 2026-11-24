@@ -1,12 +1,13 @@
 from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from .views import (ClienteViewSet, MeView, ProveedorViewSet,
+from .views import (ClienteViewSet, DistribuidorViewSet, MeView, ProveedorViewSet,
                     TrabajadorViewSet, UserViewSet)
 
 router = SimpleRouter()
 router.register("clientes", ClienteViewSet, basename="cliente")
 router.register("proveedores", ProveedorViewSet, basename="proveedor")
+router.register("distribuidores", DistribuidorViewSet, basename="distribuidor")
 router.register("trabajadores", TrabajadorViewSet, basename="trabajador")
 router.register("usuarios", UserViewSet, basename="usuario")
 

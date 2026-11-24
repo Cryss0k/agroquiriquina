@@ -1,12 +1,13 @@
 import secrets
 
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.models import SyncModel
 from apps.core.validators import normalizar_rut, validar_rut
 
-from .passwords import hash_password, verify_password
+from .passwords import hash_password, password_validation_error, verify_password
 
 
 class Rol(models.TextChoices):
@@ -29,6 +30,9 @@ class User(AbstractUser):
         if raw_password is None:
             self.set_unusable_password()
         else:
+            error = password_validation_error(raw_password)
+            if error:
+                raise ValidationError(error)
             self.password = hash_password(raw_password)
 
     def set_unusable_password(self):
@@ -83,6 +87,15 @@ class Proveedor(Persona):
 
     class Meta:
         verbose_name_plural = "proveedores"
+
+
+class Distribuidor(Persona):
+    """Empresa o persona encargada de transportar y entregar despachos."""
+    patente = models.CharField(max_length=10, blank=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "distribuidores"
 
 
 class Trabajador(Persona):

@@ -29,7 +29,7 @@ class PagoNestedSerializer(serializers.ModelSerializer):
 class DespachoNestedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Despacho
-        fields = ["id", "fecha", "hora", "direccion", "comuna", "estado",
+        fields = ["id", "distribuidor", "fecha", "hora", "direccion", "comuna", "estado",
                   "transportista", "patente", "observaciones"]
         extra_kwargs = ID_OFFLINE
 
@@ -47,7 +47,7 @@ class PagoSerializer(serializers.ModelSerializer):
 class DespachoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Despacho
-        fields = ["id", "venta", "fecha", "hora", "direccion", "comuna", "estado",
+        fields = ["id", "venta", "distribuidor", "fecha", "hora", "direccion", "comuna", "estado",
                   "transportista", "patente", "observaciones", "updated_at", "is_deleted"]
         read_only_fields = ["updated_at"]
         extra_kwargs = ID_OFFLINE

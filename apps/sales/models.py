@@ -102,6 +102,10 @@ class Despacho(SyncModel):
         CANCELADO = "CANCELADO", "Cancelado"
 
     venta = models.OneToOneField(Venta, on_delete=models.CASCADE, related_name="despacho")
+    distribuidor = models.ForeignKey(
+        "users.Distribuidor", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="despachos",
+    )
     fecha = models.DateField()
     hora = models.TimeField(null=True, blank=True)
     direccion = models.CharField(max_length=255)

@@ -12,9 +12,10 @@ from apps.core.permissions import HasRole, SUPERVISOR, VENDEDOR
 from apps.core.viewsets import SyncModelViewSet
 
 from .authentication import AppTokenRefreshSerializer, LOCKED_ACCOUNT
-from .models import Cliente, Proveedor, Trabajador, User
+from .models import Cliente, Distribuidor, Proveedor, Trabajador, User
 from .serializers import (
     ClienteSerializer,
+    DistribuidorSerializer,
     LoginSerializer,
     LoginTokenSerializer,
     ProveedorSerializer,
@@ -43,6 +44,15 @@ class ProveedorViewSet(SyncModelViewSet):
     search_fields = ["nombre", "rut", "rubro"]
 
 
+class DistribuidorViewSet(SyncModelViewSet):
+    queryset = Distribuidor.objects.all()
+    serializer_class = DistribuidorSerializer
+    read_roles = [VENDEDOR]
+    write_roles = []
+    search_fields = ["nombre", "rut", "patente"]
+    filterset_fields = ["activo"]
+
+
 class TrabajadorViewSet(SyncModelViewSet):
     queryset = Trabajador.objects.all()
     serializer_class = TrabajadorSerializer
@@ -57,8 +67,8 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by("username")
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated, HasRole]
-    read_roles = []
-    write_roles = []
+    read_roles = ["ADMIN"]
+    write_roles = ["ADMIN"]
 
     @action(detail=True, methods=["post"], url_path="desbloquear")
     def desbloquear(self, request, pk=None):

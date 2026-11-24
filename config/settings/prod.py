@@ -5,7 +5,7 @@ from .base import env_bool, env_list
 
 DEBUG = False
 
-if SECRET_KEY == "dev-insecure-key-change-me":  # noqa: F405
+if os.environ.get("DJANGO_SECRET_KEY") is None:  # noqa: F405
     raise RuntimeError("Define DJANGO_SECRET_KEY en producción.")
 
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")

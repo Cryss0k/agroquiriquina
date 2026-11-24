@@ -89,3 +89,55 @@ class MovimientoStock(SyncModel):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class Compra(SyncModel):
+    """Compra de insumos realizada a un proveedor."""
+
+    class Estado(models.TextChoices):
+        REGISTRADA = "REGISTRADA", "Registrada"
+        RECEPCIONADA = "RECEPCIONADA", "Recepcionada"
+        ANULADA = "ANULADA", "Anulada"
+
+    proveedor = models.ForeignKey(
+        "users.Proveedor", on_delete=models.PROTECT, related_name="compras",
+    )
+    usuario = models.ForeignKey(
+        "users.User", on_delete=models.PROTECT, related_name="compras",
+    )
+    fecha = models.DateTimeField()
+    estado = models.CharField(
+        max_length=12, choices=Estado.choices, default=Estado.REGISTRADA,
+    )
+    total = models.DecimalField(max_digits=14, decimal_places=0, default=0)
+    observaciones = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-fecha"]
+
+    def recalcular_total(self, save=True):
+        from django.db.models import Sum
+
+        total = self.detalles.aggregate(total=Sum("subtotal"))["total"] or Decimal("0")
+        self.total = total
+        if save:
+            self.save(update_fields=["total", "updated_at"])
+        return total
+
+
+class DetalleCompra(SyncModel):
+    compra = models.ForeignKey(
+        Compra, on_delete=models.CASCADE, related_name="detalles",
+    )
+    insumo = models.ForeignKey(
+        InsumoAgricola, on_delete=models.PROTECT, related_name="detalles_compra",
+    )
+    cantidad = models.DecimalField(max_digits=12, decimal_places=3)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=0)
+    subtotal = models.DecimalField(
+        max_digits=14, decimal_places=0, editable=False, default=0,
+    )
+
+    def save(self, *args, **kwargs):
+        self.subtotal = (self.cantidad * self.costo_unitario).quantize(Decimal("1"))
+        super().save(*args, **kwargs)

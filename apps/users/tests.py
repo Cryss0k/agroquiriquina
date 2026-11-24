@@ -1,5 +1,6 @@
 
 from django.core.management import call_command
+from django.core.exceptions import ValidationError
 from rest_framework.test import APITestCase  # pyright: ignore[reportMissingImports]
 
 from apps.hr.models import Desempeno, Remuneracion
@@ -91,6 +92,38 @@ class UsuariosDemoTests(APITestCase):
         self.assertTrue(user.password.startswith("pbkdf2_sha256$"))
         self.assertTrue(user.check_password("Valida123!"))
 
+    def test_modelo_tambien_impide_claves_debiles(self):
+        user = User(username="prueba_modelo")
+        with self.assertRaises(ValidationError):
+            user.set_password("debil")
+        user.set_password("Segura123!")
+        self.assertTrue(user.check_password("Segura123!"))
+
+    def test_admin_crea_usuarios_con_cada_rol_y_sin_clave_no_crea(self):
+        self._auth("admin")
+
+        response = self.client.post("/api/v1/usuarios/", {
+            "username": "sin_clave",
+        }, format="json")
+        self.assertEqual(response.status_code, 400)
+
+        for username, rol in (
+            ("nuevo_admin", "ADMIN"),
+            ("nuevo_vendedor", "VENDEDOR"),
+            ("nuevo_supervisor", "SUPERVISOR"),
+        ):
+            with self.subTest(rol=rol):
+                response = self.client.post("/api/v1/usuarios/", {
+                    "username": username,
+                    "password": "NuevaClave123!",
+                    "rol": rol,
+                    "is_active": True,
+                }, format="json")
+                self.assertEqual(response.status_code, 201, response.data)
+                user = User.objects.get(username=username)
+                self.assertEqual(user.rol, rol)
+                self.assertTrue(user.check_password("NuevaClave123!"))
+
     def test_supervisores_estan_vinculados_a_trabajador(self):
         sup = User.objects.get(username="supervisor1")
         self.assertTrue(Trabajador.objects.filter(pk=sup.persona_id).exists())
@@ -140,7 +173,7 @@ class UsuariosDemoTests(APITestCase):
             Remuneracion.objects.count(),
         ))
         u = User.objects.get(username="vendedor1")
-        u.set_password("otra-clave-123")
+        u.set_password("Otra-clave-123!")
         u.save()
         call_command("seed_demo", "--reset", verbosity=0)
         self.assertEqual(self._login("vendedor1").status_code, 200)
