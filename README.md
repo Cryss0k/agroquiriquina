@@ -9,6 +9,8 @@ El sistema resuelve la problemática de registro operativo en zonas rurales con 
 * **Arquitectura Desacoplada:** Separación entre backend (API REST en Django) y frontend (SPA/PWA en React + TypeScript).
 * **Tolerancia a Fallos de Red:** Cola de persistencia local en el cliente para operaciones críticas (ventas, clientes y registros de terreno) con sincronización diferida.
 * **Integridad de Datos:** Uso de identificadores únicos universales (UUID) en el cliente para garantizar idempotencia y evitar duplicidad en reintentos de envío masivo (*bulk sync*).
+* **Límite Offline:** La aplicación conserva hasta 500 ventas pendientes localmente; cada reintento usa lotes de hasta 500 y el servidor descarta UUID ya recibidos.
+* **Directorio y reportes:** Clientes y proveedores guardan datos de contacto/facturación; Finanzas genera informes por período con ventas, compras, nómina y rentabilidad basada en el costo unitario de cada producto.
 * **Seguridad Aplicada:** Autenticación sin estado mediante JWT, derivación segura de contraseñas (PBKDF2-HMAC-SHA256), políticas de complejidad de claves y mitigación de ataques de fuerza bruta mediante bloqueo temporal de cuentas.
 
 ## 2. Stack Tecnológico y Arquitectura
@@ -140,6 +142,8 @@ cd frontend
 npm run type-check
 npm run build
 ```
+
+En Finanzas, el reporte se genera bajo demanda indicando fecha inicial y final. Las compras registradas o recepcionadas se contabilizan como egresos (las anuladas se excluyen); la rentabilidad por producto usa el costo unitario mantenido en Bodega. Si un producto vendido no tiene costo configurado, su utilidad y el resultado neto quedan marcados como no calculables, en vez de asumir costo cero.
 
 ## 7. Limitaciones Conocidas (Alcance del Prototipo)
 

@@ -32,7 +32,8 @@ export function Dispatches({ state, toast }: AppActions) {
     {loading && !dispatches.length && !error && <Skeletons variant="cards" count={3} />}
     {filtered.map(dispatch => {
       const sale = sales.find(item => item.id === dispatch.venta);
-      return <DispatchCard key={dispatch.id} item={dispatch} customer={state.cat.clientes.find(c => c.id === sale?.cliente)?.nombre ?? `Venta ${dispatch.venta.slice(0, 8)}`} onSave={async patch => {
+      const customer = state.cat.clientes.find(c => c.id === sale?.cliente);
+      return <DispatchCard key={dispatch.id} item={dispatch} customer={customer} customerName={customer?.nombre ?? `Venta ${dispatch.venta.slice(0, 8)}`} toast={toast} onSave={async patch => {
         try {
           const result = await api<Dispatch>(`/despachos/${dispatch.id}/`, { method: 'PATCH', body: patch });
           setDispatches(current => current.map(item => item.id === dispatch.id ? result : item)); toast('Despacho actualizado');
@@ -41,16 +42,26 @@ export function Dispatches({ state, toast }: AppActions) {
     })}
   </>;
 }
-function DispatchCard({ item, customer, onSave }: { item: Dispatch; customer: string; onSave: (patch: Partial<Dispatch>) => Promise<void> }) {
+function DispatchCard({ item, customer, customerName, toast, onSave }: { item: Dispatch; customer?: AppActions['state']['cat']['clientes'][number]; customerName: string; toast: AppActions['toast']; onSave: (patch: Partial<Dispatch>) => Promise<void> }) {
   const [status, setStatus] = useState(item.estado); const [driver, setDriver] = useState(item.transportista ?? '');
   const [plate, setPlate] = useState(item.patente ?? ''); const [notes, setNotes] = useState(item.observaciones ?? '');
-  return <details className="card"><summary><b>{customer}</b> <span className={`bd ${item.estado === 'ENTREGADO' ? 'ok' : item.estado === 'CANCELADO' ? 'no' : ''}`}>{item.estado}</span>
+  const [date, setDate] = useState(item.fecha); const [time, setTime] = useState(item.hora ?? '');
+  const [address, setAddress] = useState(item.direccion); const [commune, setCommune] = useState(item.comuna ?? '');
+  return <details className="card"><summary><b>{customerName}</b> <span className={`bd ${item.estado === 'ENTREGADO' ? 'ok' : item.estado === 'CANCELADO' ? 'no' : ''}`}>{item.estado}</span>
     <br /><small>{item.fecha} {item.hora ?? ''} · {item.direccion} {item.comuna ?? ''}</small></summary>
+    {customer && <small>Receptor: {customer.nombre} · {customer.telefono ?? 'Sin teléfono'} · {customer.email ?? 'Sin correo'}</small>}
+    <label htmlFor={`dispatch-date-${item.id}`}>Fecha acordada</label><input id={`dispatch-date-${item.id}`} type="date" required value={date} onChange={e => setDate(e.target.value)} />
+    <label htmlFor={`dispatch-time-${item.id}`}>Hora acordada</label><input id={`dispatch-time-${item.id}`} type="time" required value={time} onChange={e => setTime(e.target.value)} />
+    <label htmlFor={`dispatch-address-${item.id}`}>Dirección de entrega</label><input id={`dispatch-address-${item.id}`} value={address} onChange={e => setAddress(e.target.value)} />
+    <label htmlFor={`dispatch-commune-${item.id}`}>Comuna de entrega</label><input id={`dispatch-commune-${item.id}`} value={commune} onChange={e => setCommune(e.target.value)} />
     <label htmlFor={`dispatch-status-${item.id}`}>Estado</label><select id={`dispatch-status-${item.id}`} value={status} onChange={e => setStatus(e.target.value)}>{['PROGRAMADO', 'EN_RUTA', 'ENTREGADO', 'CANCELADO'].map(s => <option key={s}>{s}</option>)}</select>
     <label htmlFor={`dispatch-driver-${item.id}`}>Transportista</label><input id={`dispatch-driver-${item.id}`} value={driver} onChange={e => setDriver(e.target.value)} />
     <label htmlFor={`dispatch-plate-${item.id}`}>Patente</label><input id={`dispatch-plate-${item.id}`} maxLength={10} value={plate} onChange={e => setPlate(e.target.value)} />
     <label htmlFor={`dispatch-notes-${item.id}`}>Observaciones</label><input id={`dispatch-notes-${item.id}`} value={notes} onChange={e => setNotes(e.target.value)} />
-    <button className="btn" onClick={() => void onSave({ estado: status, transportista: driver.trim(), patente: plate.trim(), observaciones: notes.trim() })}>{icon('check2-circle')} Guardar cambios</button>
+    <button className="btn" onClick={() => {
+      if (!date || !time || !address.trim()) { toast('Indica fecha, hora y dirección del despacho', true); return; }
+      void onSave({ fecha: date, hora: time, direccion: address.trim(), comuna: commune.trim(), estado: status, transportista: driver.trim(), patente: plate.trim(), observaciones: notes.trim() });
+    }}>{icon('check2-circle')} Guardar cambios</button>
     <a className="btn sm sec" href={`#/venta/${item.venta}`}>Ver venta</a>
   </details>;
 }

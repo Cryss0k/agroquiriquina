@@ -51,6 +51,7 @@ export function NewSale({ state, update, toast, sync }: AppActions) {
   const [dueDate, setDueDate] = useState('');
   const [dispatch, setDispatch] = useState(false);
   const [dispatchDate, setDispatchDate] = useState(localDate());
+  const [dispatchTime, setDispatchTime] = useState('');
   const [address, setAddress] = useState('');
   const [commune, setCommune] = useState('');
   const selectedProduct = state.cat.productos.find(item => item.id === product);
@@ -64,13 +65,16 @@ export function NewSale({ state, update, toast, sync }: AppActions) {
   const saveSale = () => {
     if (!client) { toast('Elige un cliente', true); return; }
     if (!lines.length) { toast('Agrega productos', true); return; }
+    if (dispatch && !dispatchDate) { toast('Indica la fecha del despacho', true); return; }
     if (dispatch && !address.trim()) { toast('Indica la dirección de despacho', true); return; }
+    if (dispatch && !dispatchTime) { toast('Indica la hora acordada para el despacho', true); return; }
+    if (state.q.ventas.length >= 500) { toast('La cola local alcanzó el máximo de 500 ventas pendientes. Sincroniza antes de registrar más.', true); return; }
     const total = Math.round(lines.reduce((sum, line) => sum + line.cantidad * line.precio_unitario, 0));
     const sale: QueuedSale = {
       id: uuid(), cliente: client, fecha: new Date().toISOString(), device_id: deviceId(),
       detalles: lines.map(line => ({ id: uuid(), producto: line.producto, cantidad: String(line.cantidad), precio_unitario: Math.round(line.precio_unitario) })),
       pagos: [{ id: uuid(), monto: total, estado: credit ? 'PENDIENTE' : 'PAGADO', metodo: credit ? 'CREDITO' : 'EFECTIVO', ...(credit && dueDate ? { fecha_vencimiento: dueDate } : {}) }],
-      ...(dispatch ? { despacho: { id: uuid(), fecha: dispatchDate, direccion: address.trim(), comuna: commune.trim() } } : {}),
+      ...(dispatch ? { despacho: { id: uuid(), fecha: dispatchDate, hora: dispatchTime, direccion: address.trim(), comuna: commune.trim() } } : {}),
     };
     update(draft => {
       draft.q.ventas.push(sale);
@@ -83,6 +87,7 @@ export function NewSale({ state, update, toast, sync }: AppActions) {
   const total = lines.reduce((sum, line) => sum + line.cantidad * line.precio_unitario, 0);
   return <>
     <section className="card"><h2>Nueva venta</h2>
+      <small>Ventas pendientes guardadas localmente: {state.q.ventas.length}/500</small>
       <label htmlFor="sale-client">Cliente</label><select id="sale-client" value={client} onChange={e => setClient(e.target.value)}><option value="">Selecciona un cliente</option>{state.cat.clientes.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
       <small><a href="#/clientes">¿Cliente nuevo? Créalo aquí</a></small>
       <label htmlFor="sale-product">Producto</label><select id="sale-product" value={product} onChange={e => setProduct(e.target.value)}><option value="">Selecciona un producto</option>{state.cat.productos.map(item => <option key={item.id} value={item.id}>{item.nombre} ({Number(item.cantidad_disponible)} {item.unidad_medida})</option>)}</select>
@@ -98,10 +103,11 @@ export function NewSale({ state, update, toast, sync }: AppActions) {
       {credit && <><label htmlFor="due-date">Vence el</label><input id="due-date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></>}
       <label><input type="checkbox" checked={dispatch} onChange={e => setDispatch(e.target.checked)} /> Programar despacho</label>
       {dispatch && <><label htmlFor="dispatch-date">Fecha</label><input id="dispatch-date" type="date" value={dispatchDate} onChange={e => setDispatchDate(e.target.value)} />
+        <label htmlFor="dispatch-time">Hora acordada</label><input id="dispatch-time" type="time" required value={dispatchTime} onChange={e => setDispatchTime(e.target.value)} />
         <label htmlFor="dispatch-address">Dirección</label><input id="dispatch-address" value={address} onChange={e => setAddress(e.target.value)} />
         <label htmlFor="dispatch-commune">Comuna</label><input id="dispatch-commune" value={commune} onChange={e => setCommune(e.target.value)} /></>}
     </section>
-    <button className="btn" onClick={saveSale}>{icon('check2-circle')} Guardar venta</button>
+    <button className="btn" disabled={state.q.ventas.length >= 500} onClick={saveSale}>{icon('check2-circle')} Guardar venta</button>
   </>;
 }
 

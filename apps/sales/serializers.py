@@ -27,6 +27,8 @@ class PagoNestedSerializer(serializers.ModelSerializer):
 
 
 class DespachoNestedSerializer(serializers.ModelSerializer):
+    hora = serializers.TimeField(required=True, allow_null=False)
+
     class Meta:
         model = Despacho
         fields = ["id", "distribuidor", "fecha", "hora", "direccion", "comuna", "estado",
@@ -45,6 +47,8 @@ class PagoSerializer(serializers.ModelSerializer):
 
 
 class DespachoSerializer(serializers.ModelSerializer):
+    hora = serializers.TimeField(required=True, allow_null=False)
+
     class Meta:
         model = Despacho
         fields = ["id", "venta", "distribuidor", "fecha", "hora", "direccion", "comuna", "estado",

@@ -62,3 +62,11 @@ class BulkVentasTests(APITestCase):
         self.client.force_authenticate(sup)
         r = self.client.post("/api/v1/sync/ventas/bulk/", [self._venta(uuid.uuid4())], format="json")
         self.assertEqual(r.status_code, 403)
+
+    def test_lote_mayor_a_500_se_rechaza_sin_guardar_registros(self):
+        payload = [self._venta(uuid.uuid4()) for _ in range(501)]
+        response = self.client.post("/api/v1/sync/ventas/bulk/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["detail"], "Máximo 500 registros por lote.")
+        from apps.sales.models import Venta
+        self.assertEqual(Venta.objects.count(), 0)

@@ -49,6 +49,7 @@ class ProductoVenta(ItemBodega):
     categoria = models.CharField(max_length=10, choices=Categoria.choices)
     variedad = models.CharField(max_length=80, blank=True)  # ej: Desirée, Cardinal
     precio_referencia = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+    costo_unitario = models.DecimalField(max_digits=12, decimal_places=0, null=True, blank=True)
     peso_saco_kg = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
 
 

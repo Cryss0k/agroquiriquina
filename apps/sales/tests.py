@@ -1,11 +1,13 @@
 from datetime import date
 from decimal import Decimal
+import uuid
 
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.inventory.models import ProductoVenta
-from apps.users.models import Cliente, Rol, User
+from apps.inventory.models import InsumoAgricola
+from apps.users.models import Cliente, Proveedor, Rol, User
 
 from .models import Despacho, Pago, Venta
 from .services import registrar_venta
@@ -20,7 +22,7 @@ class VentasFlujoTests(APITestCase):
         self.cliente = Cliente.objects.create(rut="11111111-1", nombre="Cliente Test")
         self.producto = ProductoVenta.objects.create(
             nombre="Papa", categoria="PAPA", cantidad_disponible=Decimal("100"),
-            precio_referencia=10000)
+            precio_referencia=10000, costo_unitario=3000)
         # Venta de 10 x 10.000 = 100.000, con despacho programado
         self.venta = registrar_venta({
             "cliente": self.cliente,
@@ -95,3 +97,56 @@ class VentasFlujoTests(APITestCase):
         self.assertEqual(r.status_code, 200, r.data)
         despacho.refresh_from_db()
         self.assertEqual(despacho.estado, Despacho.Estado.ENTREGADO)
+
+    def test_venta_con_despacho_exige_hora_y_vincula_receptor(self):
+        self.client.force_authenticate(self.vendedor)
+        payload = {
+            "id": str(uuid.uuid4()), "cliente": str(self.cliente.pk),
+            "fecha": timezone.now().isoformat(),
+            "detalles": [{"producto": str(self.producto.pk), "cantidad": "1", "precio_unitario": 10000}],
+            "despacho": {"id": str(uuid.uuid4()), "fecha": "2026-02-10",
+                         "direccion": "Av. Central 123", "comuna": "Chillán"},
+        }
+        missing_time = self.client.post("/api/v1/ventas/", payload, format="json")
+        self.assertEqual(missing_time.status_code, 400, missing_time.data)
+
+        payload["despacho"]["hora"] = "14:30"
+        response = self.client.post("/api/v1/ventas/", payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        dispatch = Despacho.objects.get(venta_id=payload["id"])
+        self.assertEqual(dispatch.fecha, date(2026, 2, 10))
+        self.assertEqual(dispatch.hora.strftime("%H:%M"), "14:30")
+        self.assertEqual(dispatch.venta.cliente_id, self.cliente.pk)
+
+    def test_reporte_por_periodo_cruza_ventas_compras_y_margen_por_producto(self):
+        self.client.force_authenticate(self.admin)
+        report_date = timezone.localdate(self.venta.fecha)
+        proveedor = Proveedor.objects.create(rut="22345678-5", nombre="Proveedor de prueba")
+        insumo = InsumoAgricola.objects.create(nombre="Fertilizante", tipo="FERTILIZANTE")
+        purchase_response = self.client.post("/api/v1/compras/", {
+            "proveedor": str(proveedor.pk), "fecha": self.venta.fecha.isoformat(),
+            "detalles": [{"insumo": str(insumo.pk), "cantidad": "2", "costo_unitario": "10000"}],
+        }, format="json")
+        self.assertEqual(purchase_response.status_code, 201, purchase_response.data)
+
+        response = self.client.get(
+            f"/api/v1/finanzas/rentabilidad/?desde={report_date}&hasta={report_date}")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Decimal(response.data["ventas_totales"]), Decimal("100000"))
+        self.assertEqual(Decimal(response.data["gastos_compras"]), Decimal("20000"))
+        self.assertEqual(Decimal(response.data["costo_productos"]), Decimal("30000"))
+        self.assertEqual(Decimal(response.data["resultado_neto"]), Decimal("50000"))
+        self.assertEqual(response.data["productos"][0]["nombre"], "Papa")
+        self.assertEqual(Decimal(response.data["productos"][0]["utilidad"]), Decimal("70000"))
+
+    def test_reporte_no_inventa_utilidad_si_falta_costo_unitario(self):
+        self.client.force_authenticate(self.admin)
+        self.producto.costo_unitario = None
+        self.producto.save(update_fields=["costo_unitario", "updated_at"])
+        report_date = timezone.localdate(self.venta.fecha)
+        response = self.client.get(
+            f"/api/v1/finanzas/rentabilidad/?desde={report_date}&hasta={report_date}")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data["resultado_neto"])
+        self.assertEqual(response.data["productos_sin_costo"], 1)
+        self.assertIsNone(response.data["productos"][0]["utilidad"])

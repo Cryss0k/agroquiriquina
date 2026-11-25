@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from apps.core.permissions import ADMIN, HasRole, VENDEDOR
 from apps.core.viewsets import SyncModelViewSet, SyncQuerysetMixin
 from apps.hr.models import Remuneracion
+from apps.inventory.models import Compra
 
 from .models import DetalleVenta, Despacho, Pago, Venta
 from .serializers import (DespachoSerializer, PagoSerializer, VentaSerializer)
@@ -128,12 +129,12 @@ class CuentasPorCobrarView(_FinanzasView):
 
 
 class RentabilidadView(_FinanzasView):
-    """GET /finanzas/rentabilidad/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (por defecto: mes actual)."""
+    """Genera un informe por período con ventas, compras, nómina y margen por producto."""
 
     def get(self, request):
         hoy = timezone.localdate()
-        desde = parse_date(request.query_params.get("desde", "")) or hoy.replace(day=1)
-        hasta = parse_date(request.query_params.get("hasta", "")) or hoy
+        desde = _fecha_informe(request, "desde", hoy.replace(day=1))
+        hasta = _fecha_informe(request, "hasta", hoy)
         if hasta < desde:
             raise ValidationError({"hasta": "Debe ser posterior a 'desde'."})
 
@@ -147,9 +148,49 @@ class RentabilidadView(_FinanzasView):
                   .filter(estado__in=[Remuneracion.Estado.APROBADA, Remuneracion.Estado.PAGADA],
                           periodo_fin__gte=desde, periodo_fin__lte=hasta, is_deleted=False)
                   .aggregate(t=Sum("total_liquido"))["t"] or Decimal("0"))
-        por_categoria = list(
+        compras = Compra.objects.filter(
+            fecha__date__gte=desde, fecha__date__lte=hasta,
+            is_deleted=False,
+            estado__in=[Compra.Estado.REGISTRADA, Compra.Estado.RECEPCIONADA],
+        )
+        total_compras = compras.aggregate(t=Sum("total"))["t"] or Decimal("0")
+        por_producto = (
             DetalleVenta.objects.filter(venta__in=ventas)
-            .values("producto__categoria").annotate(total=Sum("subtotal")).order_by("-total"))
+            .values("producto_id", "producto__nombre", "producto__categoria",
+                    "producto__costo_unitario")
+            .annotate(cantidad=Sum("cantidad"), ventas=Sum("subtotal"))
+            .order_by("producto__nombre")
+        )
+        productos = []
+        costo_productos = Decimal("0")
+        productos_sin_costo = 0
+        for fila in por_producto:
+            costo_unitario = fila["producto__costo_unitario"]
+            if costo_unitario is None:
+                costo = utilidad = rentabilidad = None
+                productos_sin_costo += 1
+            else:
+                costo = (fila["cantidad"] * costo_unitario).quantize(Decimal("1"))
+                utilidad = fila["ventas"] - costo
+                rentabilidad = (
+                    (utilidad * Decimal("100") / fila["ventas"]).quantize(Decimal("0.01"))
+                    if fila["ventas"] else Decimal("0")
+                )
+                costo_productos += costo
+            productos.append({
+                "producto": str(fila["producto_id"]),
+                "nombre": fila["producto__nombre"],
+                "categoria": fila["producto__categoria"],
+                "cantidad_vendida": fila["cantidad"],
+                "ventas": fila["ventas"],
+                "costo": costo,
+                "utilidad": utilidad,
+                "rentabilidad_porcentaje": rentabilidad,
+            })
+        resultado_neto = (
+            total_ventas - costo_productos - total_compras - nomina
+            if productos_sin_costo == 0 else None
+        )
 
         return Response({
             "desde": desde, "hasta": hasta,
@@ -157,9 +198,24 @@ class RentabilidadView(_FinanzasView):
             "cobrado": cobrado,
             "por_cobrar": total_ventas - cobrado,
             "costo_nomina": nomina,
-            "margen_estimado": total_ventas - nomina,
-            "ventas_por_categoria": [
-                {"categoria": r["producto__categoria"], "total": r["total"]} for r in por_categoria],
-            "nota": "Margen estimado = ventas - nómina aprobada/pagada. "
-                    "Aún no incluye costo de insumos ni compras a proveedores.",
+            "gastos_compras": total_compras,
+            "costo_productos": costo_productos,
+            "productos_sin_costo": productos_sin_costo,
+            "resultado_neto": resultado_neto,
+            "margen_estimado": resultado_neto,
+            "productos": productos,
+            "nota": "La utilidad por producto usa su costo unitario configurado. "
+                    "Los egresos incluyen compras registradas y recepcionadas, excluyendo anuladas; "
+                    "el resultado neto también descuenta nómina aprobada o pagada. "
+                    "Si falta el costo de algún producto vendido, el resultado neto no se calcula.",
         })
+
+
+def _fecha_informe(request, campo, defecto):
+    valor = request.query_params.get(campo)
+    if not valor:
+        return defecto
+    fecha = parse_date(valor)
+    if fecha is None:
+        raise ValidationError({campo: "Usa el formato YYYY-MM-DD."})
+    return fecha

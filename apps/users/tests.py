@@ -147,6 +147,40 @@ class UsuariosDemoTests(APITestCase):
                 self._auth(username)
                 self.assertEqual(self.client.get(url).status_code, status)
 
+    def test_directorio_cliente_y_proveedor_crea_y_actualiza_datos_completos(self):
+        self._auth("admin")
+        cliente = self.client.post("/api/v1/clientes/", {
+            "rut": "87.654.321-4", "nombre": "Cliente Nuevo", "telefono": "+56912345678",
+            "email": "cliente@example.cl", "direccion": "Camino Rural 1", "comuna": "Chillán",
+            "region": "Ñuble", "tipo": "MAYORISTA", "razon_social": "Cliente Nuevo SpA",
+            "limite_credito": "150000",
+        }, format="json")
+        self.assertEqual(cliente.status_code, 201, cliente.data)
+        cliente_id = cliente.data["id"]
+        cliente = self.client.patch(f"/api/v1/clientes/{cliente_id}/", {
+            "telefono": "+56987654321", "email": "actualizado@example.cl",
+            "direccion": "Camino Rural 2", "region": "Biobío",
+            "tipo": "FERIA", "limite_credito": "250000",
+        }, format="json")
+        self.assertEqual(cliente.status_code, 200, cliente.data)
+        self.assertEqual(cliente.data["email"], "actualizado@example.cl")
+        self.assertEqual(cliente.data["tipo"], "FERIA")
+        self.assertEqual(str(cliente.data["limite_credito"]), "250000")
+
+        proveedor = self.client.post("/api/v1/proveedores/", {
+            "rut": "98.765.431-7", "nombre": "Proveedor Nuevo", "telefono": "+56911111111",
+            "email": "proveedor@example.cl", "direccion": "Ruta 5", "comuna": "Bulnes",
+            "region": "Ñuble", "rubro": "Fertilizantes", "condiciones_pago": "30 días",
+        }, format="json")
+        self.assertEqual(proveedor.status_code, 201, proveedor.data)
+        proveedor = self.client.patch(f"/api/v1/proveedores/{proveedor.data['id']}/", {
+            "email": "ventas@example.cl", "direccion": "Ruta 5 km 3",
+            "condiciones_pago": "Transferencia anticipada",
+        }, format="json")
+        self.assertEqual(proveedor.status_code, 200, proveedor.data)
+        self.assertEqual(proveedor.data["email"], "ventas@example.cl")
+        self.assertEqual(proveedor.data["condiciones_pago"], "Transferencia anticipada")
+
     def test_seed_es_idempotente_y_reset_restablece_clave(self):
         call_command("seed_demo", verbosity=0)
         self.assertEqual(User.objects.filter(username="admin").count(), 1)

@@ -10,7 +10,8 @@ class ProductoVentaSerializer(serializers.ModelSerializer):
         model = ProductoVenta
         fields = ["id", "nombre", "categoria", "variedad", "cantidad_disponible",
                   "unidad_medida", "stock_minimo", "bajo_stock_minimo",
-                  "precio_referencia", "peso_saco_kg", "activo", "updated_at", "is_deleted"]
+                  "precio_referencia", "costo_unitario", "peso_saco_kg", "activo",
+                  "updated_at", "is_deleted"]
         # El stock solo cambia vía movimientos (POST .../movimiento/) o ventas.
         read_only_fields = ["cantidad_disponible", "updated_at"]
 
