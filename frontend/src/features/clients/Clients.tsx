@@ -98,6 +98,31 @@ export function Clients({ state, update, toast, sync }: AppActions) {
     } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo guardar el proveedor', true); }
   };
 
+  const deleteClient = async (client: Client) => {
+    if (!window.confirm(`¿Eliminar a ${client.nombre}?`)) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar un cliente', true); return; }
+    try {
+      await api(`/clientes/${client.id}/`, { method: 'DELETE' });
+      update(draft => {
+        draft.cat.clientes = draft.cat.clientes.filter(item => item.id !== client.id);
+        draft.q.clientes = draft.q.clientes.filter(item => item.id !== client.id);
+      });
+      if (editingClient === client.id) { setEditingClient(null); setClientForm(emptyClient()); }
+      toast('Cliente eliminado');
+    } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo eliminar el cliente', true); }
+  };
+
+  const deleteSupplier = async (supplier: Supplier) => {
+    if (!window.confirm(`¿Eliminar a ${supplier.nombre}?`)) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar un proveedor', true); return; }
+    try {
+      await api(`/proveedores/${supplier.id}/`, { method: 'DELETE' });
+      setSuppliers(current => current.filter(item => item.id !== supplier.id));
+      if (editingSupplier === supplier.id) { setEditingSupplier(null); setSupplierForm(emptySupplier()); }
+      toast('Proveedor eliminado');
+    } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo eliminar el proveedor', true); }
+  };
+
   const visibleClients = state.cat.clientes.filter(item => `${item.nombre} ${item.rut}`.toLowerCase().includes(search.toLowerCase()));
   const visibleSuppliers = suppliers.filter(item => `${item.nombre} ${item.rut}`.toLowerCase().includes(search.toLowerCase()));
   const clientField = (key: keyof ClientForm, label: string, type = 'text') => (
@@ -136,6 +161,7 @@ export function Clients({ state, update, toast, sync }: AppActions) {
         {visibleClients.map(client => <div className="li" key={client.id}>
           <span className="who"><i className="av">{initials(client.nombre)}</i><span>{client.nombre}<br /><small>{client.rut} · {client.telefono ?? ''} · {client.email ?? ''}</small><br /><small>{client.direccion ?? ''} {client.comuna ?? ''} {client.region ?? ''}</small></span></span>
           <button className="btn sm sec" disabled={!state.online} onClick={() => editClient(client)}>{icon('pencil')} Editar</button>
+          <button className="btn sm red" disabled={!state.online} onClick={() => void deleteClient(client)}>{icon('trash')} Eliminar</button>
           {state.q.clientes.some(item => item.id === client.id) && <span className="bd">{icon('clock-history')} por enviar</span>}
         </div>)}
         {!visibleClients.length && <small>Sin resultados</small>}
@@ -158,6 +184,7 @@ export function Clients({ state, update, toast, sync }: AppActions) {
         {visibleSuppliers.map(supplier => <div className="li" key={supplier.id}>
           <span className="who"><i className="av">{initials(supplier.nombre)}</i><span>{supplier.nombre}<br /><small>{supplier.rut} · {supplier.telefono ?? ''} · {supplier.email ?? ''}</small><br /><small>{supplier.rubro ?? ''} · {supplier.condiciones_pago ?? ''}</small></span></span>
           <button className="btn sm sec" onClick={() => { setEditingSupplier(supplier.id); setSupplierForm({ ...emptySupplier(), ...supplier }); }}>{icon('pencil')} Editar</button>
+          <button className="btn sm red" disabled={!state.online} onClick={() => void deleteSupplier(supplier)}>{icon('trash')} Eliminar</button>
         </div>)}
         {!visibleSuppliers.length && <small>{state.online ? 'Sin resultados' : 'Conéctate para cargar proveedores'}</small>}
       </section>

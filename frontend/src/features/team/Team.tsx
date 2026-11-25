@@ -101,6 +101,16 @@ export function Team({ state, toast }: AppActions) {
       await load();
     } catch (err) { toast(err instanceof Error ? err.message : 'No se pudo desbloquear el usuario', true); }
   };
+  const removeRecord = async (record: TeamRecord) => {
+    const name = personName(record);
+    if (!window.confirm(`¿Eliminar a ${name}?`)) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar este registro', true); return; }
+    try {
+      await api(`${endpoint}${record.id}/`, { method: 'DELETE' });
+      if (editing?.id === record.id) { setEditing(null); setOpen(false); }
+      toast('Registro eliminado'); await load();
+    } catch (err) { toast(err instanceof Error ? err.message : 'No se pudo eliminar el registro', true); }
+  };
   const personName = (record: TeamRecord) => tab === 'u' ? (record as Account).first_name || (record as Account).username : (record as Worker | Supplier).nombre;
   const formFields = tab === 't' ? <>
     <TextField id="ru" label="RUT" value={field('ru')} onChange={setField} placeholder="12.345.678-5" />
@@ -134,7 +144,7 @@ export function Team({ state, toast }: AppActions) {
     </details>
     <section className="card"><h2>{teamEndpoints[tab][1]}</h2>{loading && !rows[tab].length && <Skeletons count={3} />}{error && <p role="alert">{error}</p>}
       {rows[tab].map(record => <div className="li" key={record.id}><span className="who"><i className="av">{initials(personName(record))}</i><span><b>{personName(record)}</b><br /><small>{tab === 't' ? `${(record as Worker).rut} · ${(record as Worker).cargo || 'Sin cargo'} · ${(record as Worker).tipo_contrato} · ${formatMoney((record as Worker).tarifa_diaria)}/día` : tab === 'p' ? `${(record as Supplier).rut} · ${(record as Supplier).rubro || 'Sin rubro'} ${(record as Supplier).telefono || ''}` : `${(record as Account).rol}`}</small></span></span>
-        <span className="form-actions">{((record as Worker).activo === false || (record as Account).is_active === false) && <span className="bd no">Inactivo</span>}{tab === 'u' && (record as Account).bloqueado && <><span className="bd no">Bloqueado ({(record as Account).intentos_fallidos} intentos)</span><button className="btn sm sec" onClick={() => void unlock(record as Account)}>Desbloquear</button></>}<button className="btn sm sec" onClick={() => edit(record)}>Editar</button></span></div>)}
+        <span className="form-actions">{((record as Worker).activo === false || (record as Account).is_active === false) && <span className="bd no">Inactivo</span>}{tab === 'u' && (record as Account).bloqueado && <><span className="bd no">Bloqueado ({(record as Account).intentos_fallidos} intentos)</span><button className="btn sm sec" onClick={() => void unlock(record as Account)}>Desbloquear</button></>}<button className="btn sm sec" onClick={() => edit(record)}>{icon('pencil')} Editar</button><button className="btn sm red" disabled={!state.online} onClick={() => void removeRecord(record)}>{icon('trash')} Eliminar</button></span></div>)}
       {!loading && !error && !rows[tab].length && <small>Sin registros</small>}
     </section>
   </>;

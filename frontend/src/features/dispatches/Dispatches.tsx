@@ -23,6 +23,15 @@ export function Dispatches({ state, toast }: AppActions) {
   }, []);
   useEffect(() => { void load(); }, [load]);
   const filtered = dispatches.filter(item => filter === 'TODOS' || item.estado === filter);
+  const deleteDispatch = async (dispatch: Dispatch) => {
+    if (!window.confirm('¿Eliminar este despacho?')) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar el despacho', true); return; }
+    try {
+      await api(`/despachos/${dispatch.id}/`, { method: 'DELETE' });
+      setDispatches(current => current.filter(item => item.id !== dispatch.id));
+      toast('Despacho eliminado');
+    } catch (err) { toast(err instanceof Error ? err.message : 'No se pudo eliminar el despacho', true); }
+  };
   return <>
     <section className="card"><div className="ph"><div><h2>Despachos</h2><small>{filtered.length} resultado(s)</small></div></div>
       <div className="chips">{['TODOS', ...statuses].map(status => <button key={status} className={`chip ${filter === status ? 'on' : ''}`} onClick={() => setFilter(status)}>{status === 'TODOS' ? 'Todos' : status}</button>)}</div>
@@ -33,7 +42,7 @@ export function Dispatches({ state, toast }: AppActions) {
     {filtered.map(dispatch => {
       const sale = sales.find(item => item.id === dispatch.venta);
       const customer = state.cat.clientes.find(c => c.id === sale?.cliente);
-      return <DispatchCard key={dispatch.id} item={dispatch} customer={customer} customerName={customer?.nombre ?? `Venta ${dispatch.venta.slice(0, 8)}`} toast={toast} onSave={async patch => {
+      return <DispatchCard key={dispatch.id} item={dispatch} customer={customer} customerName={customer?.nombre ?? `Venta ${dispatch.venta.slice(0, 8)}`} toast={toast} onDelete={() => void deleteDispatch(dispatch)} onSave={async patch => {
         try {
           const result = await api<Dispatch>(`/despachos/${dispatch.id}/`, { method: 'PATCH', body: patch });
           setDispatches(current => current.map(item => item.id === dispatch.id ? result : item)); toast('Despacho actualizado');
@@ -42,7 +51,7 @@ export function Dispatches({ state, toast }: AppActions) {
     })}
   </>;
 }
-function DispatchCard({ item, customer, customerName, toast, onSave }: { item: Dispatch; customer?: AppActions['state']['cat']['clientes'][number]; customerName: string; toast: AppActions['toast']; onSave: (patch: Partial<Dispatch>) => Promise<void> }) {
+function DispatchCard({ item, customer, customerName, toast, onSave, onDelete }: { item: Dispatch; customer?: AppActions['state']['cat']['clientes'][number]; customerName: string; toast: AppActions['toast']; onSave: (patch: Partial<Dispatch>) => Promise<void>; onDelete: () => void }) {
   const [status, setStatus] = useState(item.estado); const [driver, setDriver] = useState(item.transportista ?? '');
   const [plate, setPlate] = useState(item.patente ?? ''); const [notes, setNotes] = useState(item.observaciones ?? '');
   const [date, setDate] = useState(item.fecha); const [time, setTime] = useState(item.hora ?? '');
@@ -62,6 +71,7 @@ function DispatchCard({ item, customer, customerName, toast, onSave }: { item: D
       if (!date || !time || !address.trim()) { toast('Indica fecha, hora y dirección del despacho', true); return; }
       void onSave({ fecha: date, hora: time, direccion: address.trim(), comuna: commune.trim(), estado: status, transportista: driver.trim(), patente: plate.trim(), observaciones: notes.trim() });
     }}>{icon('check2-circle')} Guardar cambios</button>
+    <button className="btn sm red" onClick={onDelete}>{icon('trash')} Eliminar</button>
     <a className="btn sm sec" href={`#/venta/${item.venta}`}>Ver venta</a>
   </details>;
 }

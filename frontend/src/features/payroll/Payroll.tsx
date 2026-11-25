@@ -27,6 +27,12 @@ export function PayrollScreen({ state, toast }: AppActions) {
     try { await api(`/remuneraciones/${record.id}/${operation}/`, { method: 'POST' }); await load(); }
     catch (err) { toast(err instanceof Error ? err.message : 'No se pudo actualizar la remuneración', true); }
   };
+  const removeRecord = async (record: Payroll) => {
+    if (!window.confirm('¿Eliminar esta remuneración?')) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar la remuneración', true); return; }
+    try { await api(`/remuneraciones/${record.id}/`, { method: 'DELETE' }); toast('Remuneración eliminada'); await load(); }
+    catch (err) { toast(err instanceof Error ? err.message : 'No se pudo eliminar la remuneración', true); }
+  };
   const exportCsv = async () => {
     try {
       const response = await fetch('/api/v1/remuneraciones/exportar/', { headers: { Authorization: `Bearer ${state.tok?.access ?? ''}` } });
@@ -47,6 +53,7 @@ export function PayrollScreen({ state, toast }: AppActions) {
       {records.map(record => <div className="li" key={record.id}><span>{state.cat.trabajadores.find(item => item.id === record.trabajador)?.nombre ?? 'Trabajador'}<br /><small>{record.periodo_inicio} → {record.periodo_fin}</small><br />
         {record.estado === 'BORRADOR' && <button className="btn sm" onClick={() => void transition(record, 'aprobar')}>Aprobar</button>}
         {record.estado === 'APROBADA' && <button className="btn sm" onClick={() => void transition(record, 'pagar')}>Marcar pagada</button>}
+        {record.estado === 'BORRADOR' && <button className="btn sm red" onClick={() => void removeRecord(record)}>{icon('trash')} Eliminar</button>}
       </span><span style={{ textAlign: 'right' }}><b>{formatMoney(record.total_liquido)}</b><br /><span className={`bd ${record.estado === 'PAGADA' ? 'ok' : ''}`}>{record.estado}</span></span></div>)}
       {!loading && !error && !records.length && <small>Aún no hay remuneraciones</small>}
     </section>

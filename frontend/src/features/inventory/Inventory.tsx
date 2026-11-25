@@ -49,6 +49,24 @@ export function Inventory({ state, toast, refreshInventory, movements }: AppActi
       toast('Insumo creado. Carga su stock con una ENTRADA.'); setSupplyForm({ nombre: '', tipo: 'OTRO', unidad_medida: 'SACO', stock_minimo: '0', dosis_por_hectarea: '0' }); await refreshInventory();
     } catch (error) { toast(error instanceof Error ? error.message : 'Error al crear el insumo', true); }
   };
+  const deleteProduct = async (productId: string) => {
+    const product = state.cat.productos.find(item => item.id === productId);
+    if (!product || !window.confirm(`¿Eliminar el producto ${product.nombre}?`)) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar el producto', true); return; }
+    try {
+      await api(`/productos/${productId}/`, { method: 'DELETE' });
+      toast('Producto eliminado'); await refreshInventory();
+    } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo eliminar el producto', true); }
+  };
+  const deleteSupply = async (supplyId: string) => {
+    const supply = state.ins.find(item => item.id === supplyId);
+    if (!supply || !window.confirm(`¿Eliminar el insumo ${supply.nombre}?`)) return;
+    if (!state.online) { toast('Necesitas conexión para eliminar el insumo', true); return; }
+    try {
+      await api(`/insumos/${supplyId}/`, { method: 'DELETE' });
+      toast('Insumo eliminado'); await refreshInventory();
+    } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo eliminar el insumo', true); }
+  };
   const saveMovement = async () => {
     const count = Number(quantity);
     if (!itemId) { toast('Elige un ítem', true); return; }
@@ -67,8 +85,13 @@ export function Inventory({ state, toast, refreshInventory, movements }: AppActi
       <span>{product.nombre}</span><span><b>{Number(product.cantidad_disponible)}</b> {product.unidad_medida} {lowStock(product) && <span className="bd no">Stock bajo</span>}</span>
       <i className={`pb ${lowStock(product) ? 'lo' : ''}`} aria-label={`Stock ${Number(product.cantidad_disponible)} de ${product.nombre}`}><u style={{ width: `${Math.min(100, Math.round(100 * Number(product.cantidad_disponible) / stockMaximum))}%` }} /></i>
       {admin && <button className="btn sm sec" onClick={() => editProduct(product.id)}>{icon('pencil')} Editar datos</button>}
+      {admin && <button className="btn sm red" disabled={!state.online} onClick={() => void deleteProduct(product.id)}>{icon('trash')} Eliminar</button>}
     </div>)}{!state.cat.productos.length && <small>Sin datos. Sincroniza con conexión.</small>}</section>
     {canSeeSupplies && <section className="card"><h2>Insumos por hectárea</h2>
+      {admin && state.ins.map(supply => <div className="li" key={`delete-${supply.id}`}>
+        <span>{supply.nombre}<br /><small>{Number(supply.cantidad_disponible)} {supply.unidad_medida}</small></span>
+        <button className="btn sm red" disabled={!state.online} onClick={() => void deleteSupply(supply.id)}>{icon('trash')} Eliminar</button>
+      </div>)}
       <label htmlFor="supply-calc">Insumo</label><select id="supply-calc" value={supplyId} onChange={event => { setSupplyId(event.target.value); setCalculation(''); }}><option value="">Selecciona un insumo</option>{state.ins.map(item => <option key={item.id} value={item.id}>{item.nombre} ({Number(item.cantidad_disponible)} {item.unidad_medida})</option>)}</select>
       <label htmlFor="hectares">Hectáreas</label><input id="hectares" type="number" step="any" min="0" value={hectares} onChange={event => setHectares(event.target.value)} />
       <button className="btn" onClick={() => {

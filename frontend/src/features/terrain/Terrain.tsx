@@ -3,6 +3,7 @@ import type { AppActions } from '../../app/types';
 import type { HistoryItem, WorkLog } from '../../types';
 import { deviceId, uuid } from '../../services/storage';
 import { icon, laborNames, localDate } from '../../app/utils';
+import { api } from '../../services/api';
 import { HistoryRow } from '../dashboard/Dashboard';
 
 export function Terrain({ state, update, toast, sync }: AppActions) {
@@ -19,6 +20,23 @@ export function Terrain({ state, update, toast, sync }: AppActions) {
     update(draft => { draft.q.desempenos.push(work); draft.hist = [history, ...draft.hist].slice(0, 15); });
     setQuantity(''); toast('Registro guardado'); void sync(false);
   };
+  const deleteWork = async (id: string) => {
+    if (!window.confirm('¿Eliminar este registro de trabajo?')) return;
+    if (state.q.desempenos.some(item => item.id === id)) {
+      update(draft => {
+        draft.q.desempenos = draft.q.desempenos.filter(item => item.id !== id);
+        draft.hist = draft.hist.filter(item => item.id !== id);
+      });
+      toast('Registro eliminado');
+      return;
+    }
+    if (!state.online) { toast('Necesitas conexión para eliminar el registro', true); return; }
+    try {
+      await api(`/desempenos/${id}/`, { method: 'DELETE' });
+      update(draft => { draft.hist = draft.hist.filter(item => item.id !== id); });
+      toast('Registro eliminado');
+    } catch (error) { toast(error instanceof Error ? error.message : 'No se pudo eliminar el registro', true); }
+  };
   return <>
     <section className="card"><h2>Registrar trabajo del día</h2>
       <label htmlFor="work-worker">Trabajador</label><select id="work-worker" value={worker} onChange={e => setWorker(e.target.value)}><option value="">Selecciona trabajador</option>{state.cat.trabajadores.map(item => <option key={item.id} value={item.id}>{item.nombre}</option>)}</select>
@@ -29,6 +47,9 @@ export function Terrain({ state, update, toast, sync }: AppActions) {
       <label htmlFor="work-date">Fecha</label><input id="work-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
       <button className="btn" onClick={saveWork}>{icon('check2-circle')} Guardar registro</button>
     </section>
-    <section className="card"><h2>Últimos registros</h2>{state.hist.map(item => <HistoryRow key={item.id} item={item} state={state} />)}{!state.hist.length && <small>Sin registros</small>}</section>
+    <section className="card"><h2>Últimos registros</h2>{state.hist.map(item => <div className="li" key={item.id}>
+      <HistoryRow item={item} state={state} />
+      <button className="btn sm red" onClick={() => void deleteWork(item.id)}>{icon('trash')} Eliminar</button>
+    </div>)}{!state.hist.length && <small>Sin registros</small>}</section>
   </>;
 }
